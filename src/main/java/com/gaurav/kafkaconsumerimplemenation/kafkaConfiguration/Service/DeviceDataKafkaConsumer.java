@@ -32,7 +32,6 @@ public class DeviceDataKafkaConsumer {
       String hexPayload = this.extractHex(mqttMessage).getValue();
       String deviceId = this.extractHex(mqttMessage).getSendId();
       DeviceDataDTO decoded = HexDecoderUtil.decodeHex(hexPayload, deviceId);
-
       DeviceData entity = mapToEntity(decoded);
       repository.save(entity);
 

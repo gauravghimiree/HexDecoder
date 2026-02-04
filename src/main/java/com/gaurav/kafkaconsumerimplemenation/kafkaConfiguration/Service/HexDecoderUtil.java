@@ -43,11 +43,29 @@ public class HexDecoderUtil {
     private static DeviceDataDTO decodeLocationMessage(String dataStr, String deviceId) {
       ValidationResult v = isLocationValid(dataStr, 56);
       if (!v.isValid) {
-        throw new IllegalStateException("Location invalid");
+        // Location not valid: do not reject message. Set location fields null and parse other available fields.
+        LocationInfo info = new LocationInfo();
+        info.utcTimeEpochSeconds = Long.parseLong(dataStr.substring(10, 18), 16);
+        info.highBits = v.binaryResult.substring(0, 4);
+        info.longitude = null;
+        info.latitude = null;
+        info.locationType = "0";
+        info.sosNum = 0;
+        // Try to parse direction, altitude and electricity if present in the payload
+        try {
+          info.direction = Integer.parseInt(dataStr.substring(48, 52), 16);
+        } catch (Exception ignored) { }
+        try {
+          info.altitude = parseAltitude(dataStr.substring(52, 56));
+        } catch (Exception ignored) { }
+        try {
+          info.electricity = Integer.parseInt(dataStr.substring(66, 68), 16);
+        } catch (Exception ignored) { }
+        return buildDto(info, 0, deviceId, MESSAGE_TYPE_LOCATION, false);
       }
 
       LocationInfo info = parseLocationInfo(dataStr, v.binaryResult, false);
-      return buildDto(info, 0, deviceId, MESSAGE_TYPE_LOCATION);
+      return buildDto(info, 0, deviceId, MESSAGE_TYPE_LOCATION, true);
     }
 
     /**
@@ -56,19 +74,45 @@ public class HexDecoderUtil {
     private static DeviceDataDTO decodeSosMessage(String dataStr, String deviceId) {
       ValidationResult v = isLocationValid(dataStr, 54);
       if (!v.isValid) {
-        throw new IllegalStateException("Location invalid");
+        // For SOS: keep the SOS/health info but mark location invalid and set coords null
+        LocationInfo info = new LocationInfo();
+        info.utcTimeEpochSeconds = Long.parseLong(dataStr.substring(10, 18), 16);
+        info.highBits = v.binaryResult.substring(0, 4);
+        info.longitude = null;
+        info.latitude = null;
+        // parse sos number and mark type as SOS
+        try {
+          info.sosNum = Integer.parseInt(dataStr.substring(80, 82), 16);
+        } catch (Exception ex) {
+          info.sosNum = 0;
+        }
+        info.locationType = "1";
+        // parse direction, altitude and electricity for SOS payload
+        try {
+          info.direction = Integer.parseInt(dataStr.substring(46, 50), 16);
+        } catch (Exception ignored) { }
+        try {
+          info.altitude = parseAltitude(dataStr.substring(50, 54));
+        } catch (Exception ignored) { }
+        try {
+          info.electricity = Integer.parseInt(dataStr.substring(56, 58), 16);
+        } catch (Exception ignored) { }
+        // still attempt to parse health data if present
+        parseHealthData(dataStr, info);
+
+        return buildDto(info, info.sosNum, deviceId, MESSAGE_TYPE_SOS, false);
       }
 
       LocationInfo info = parseLocationInfo(dataStr, v.binaryResult, true);
       parseHealthData(dataStr, info);
 
-      return buildDto(info, info.sosNum, deviceId, MESSAGE_TYPE_SOS);
+      return buildDto(info, info.sosNum, deviceId, MESSAGE_TYPE_SOS, true);
     }
 
     /**
      * Build DeviceDataResponseDto from LocationInfo
      */
-    private static DeviceDataDTO buildDto(LocationInfo info, int sosNum, String deviceId, String messageType) {
+    private static DeviceDataDTO buildDto(LocationInfo info, int sosNum, String deviceId, String messageType, boolean locationValid) {
       return DeviceDataDTO.builder()
 
               .latitude(info.latitude != null ? info.latitude.floatValue() : null)
@@ -85,7 +129,7 @@ public class HexDecoderUtil {
               .deviceCode(parseDeviceCode(deviceId))
               .messageType(messageType)
               .locationType(info.locationType)
-              .locationValid(true)
+              .locationValid(locationValid)
               .positioningFormat(info.highBits)
               .build();
     }
@@ -108,7 +152,6 @@ public class HexDecoderUtil {
     private static class ValidationResult {
       boolean isValid;
       String binaryResult;
-
       ValidationResult(boolean valid, String binary) {
         this.isValid = valid;
         this.binaryResult = binary;
@@ -298,5 +341,4 @@ public class HexDecoderUtil {
       return isNegative ? -(altitudeRaw & 0x7FFF) : altitudeRaw;
     }
   }
-
 
