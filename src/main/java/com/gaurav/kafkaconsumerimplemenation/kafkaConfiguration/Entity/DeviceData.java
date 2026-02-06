@@ -1,6 +1,7 @@
 package com.gaurav.kafkaconsumerimplemenation.kafkaConfiguration.Entity;
 
 
+import com.gaurav.kafkaconsumerimplemenation.device.entity.DeviceInfo;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

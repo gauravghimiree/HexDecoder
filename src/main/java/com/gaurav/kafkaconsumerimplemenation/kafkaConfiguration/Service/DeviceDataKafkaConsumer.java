@@ -5,7 +5,6 @@ import com.gaurav.kafkaconsumerimplemenation.kafkaConfiguration.Entity.DeviceDat
 import com.gaurav.kafkaconsumerimplemenation.kafkaConfiguration.Entity.dto.DeviceDataDTO;
 import com.gaurav.kafkaconsumerimplemenation.kafkaConfiguration.Entity.dto.ReceiveDTO;
 import com.gaurav.kafkaconsumerimplemenation.kafkaConfiguration.repository.DeviceDataRepo;
-import jakarta.persistence.Convert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -25,8 +24,7 @@ public class DeviceDataKafkaConsumer {
     this.repository = repository;
   }
 
-
-  @KafkaListener(topics = "messagefromsatelite", groupId = "abc")
+  @KafkaListener(topics = "messagefromsatelite", groupId = "abc",concurrency = "6")
   public void consumeMessage(String mqttMessage) {
     try {
       String hexPayload = this.extractHex(mqttMessage).getValue();
@@ -52,7 +50,6 @@ public class DeviceDataKafkaConsumer {
 
   private DeviceData mapToEntity(DeviceDataDTO dto) {
     return DeviceData.builder()
-
             .latitude(dto.getLatitude())
             .longitude(dto.getLongitude())
             .altitude(dto.getAltitude())
